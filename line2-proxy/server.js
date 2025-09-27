@@ -33,6 +33,7 @@ app.get("/line2", async (req, res) => {
     .slice(0, 2)
     .map(c => {
       const date = new Date(c.expectedDepartureTime);
+      date.setHours(date.getHours() + 2); // add 2 hours for correct timezone
       const hours = date.getHours().toString().padStart(2, "0");
       const minutes = date.getMinutes().toString().padStart(2, "0");
       return { time: `${hours}:${minutes}` };
