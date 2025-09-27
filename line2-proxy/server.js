@@ -8,10 +8,8 @@ app.get("/line2", async (req, res) => {
   const query = {
     query: `{
       stopPlace(id: "NSR:StopPlace:62104") {
-        name
         estimatedCalls(timeRange: 7200, numberOfDepartures: 10) {
           expectedDepartureTime
-          destinationDisplay { frontText }
           serviceJourney { line { publicCode } }
         }
       }
@@ -29,15 +27,18 @@ app.get("/line2", async (req, res) => {
 
   const data = await r.json();
 
-  // Keep only Line 2
-  const calls = data.data.stopPlace.estimatedCalls.filter(
-    (c) => c.serviceJourney.line.publicCode === "2"
-  );
+  // Filter only Line 2 and take the first two departures
+  const calls = data.data.stopPlace.estimatedCalls
+    .filter(c => c.serviceJourney.line.publicCode === "2")
+    .slice(0, 2)
+    .map(c => {
+      const date = new Date(c.expectedDepartureTime);
+      const hours = date.getHours().toString().padStart(2, "0");
+      const minutes = date.getMinutes().toString().padStart(2, "0");
+      return { time: `${hours}:${minutes}` };
+    });
 
-  res.json({
-    stop: data.data.stopPlace.name,
-    departures: calls.slice(0, 2),
-  });
+  res.json({ departures: calls });
 });
 
 app.listen(PORT, () => {
