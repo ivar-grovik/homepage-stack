@@ -4,19 +4,17 @@ import fetch from "node-fetch";
 const app = express();
 const PORT = 3000;
 
-// Quays where buses leave Fyllingsdalen terminal
-const quayIds = [
-  "NSR:Quay:106949", // update with actual quay IDs
-  "NSR:Quay:106950"
-];
+// Stop/Quay IDs
+const stopPlaceId = "NSR:StopPlace:62104";     // Line 2
+const quayIds = ["NSR:Quay:106949", "NSR:Quay:106950"]; // Line 4 + 50E
 
-// Lines we want to show
+// Lines we want to display
 const linesToShow = ["2", "4", "50E"];
 
 app.get("/departures", async (req, res) => {
   try {
-    // Build GraphQL query for all quays
-    const queries = quayIds.map(
+    // Build GraphQL query
+    const quayQueries = quayIds.map(
       id => `
         q${id.replace(/\D/g, "")}: quay(id: "${id}") {
           id
@@ -29,7 +27,16 @@ app.get("/departures", async (req, res) => {
       `
     ).join("\n");
 
-    const query = `{ ${queries} }`;
+    const query = `{
+      stop: stopPlace(id: "${stopPlaceId}") {
+        estimatedCalls(timeRange: 86400, numberOfDepartures: 20) {
+          expectedDepartureTime
+          destinationDisplay { frontText }
+          serviceJourney { line { publicCode } }
+        }
+      }
+      ${quayQueries}
+    }`;
 
     const response = await fetch("https://api.entur.io/journey-planner/v3/graphql", {
       method: "POST",
@@ -42,10 +49,13 @@ app.get("/departures", async (req, res) => {
 
     const data = await response.json();
 
-    // Collect all calls from all quays
-    const allCalls = Object.values(data.data).flatMap(q => q.estimatedCalls);
+    // Merge calls from stopPlace + all quays
+    const allCalls = [
+      ...(data.data.stop?.estimatedCalls || []),
+      ...Object.values(data.data).filter(x => x?.estimatedCalls).flatMap(q => q.estimatedCalls),
+    ];
 
-    // Filter by line and format times
+    // Group by line
     const result = linesToShow.map(code => {
       const filtered = allCalls
         .filter(c => c.serviceJourney.line.publicCode === code)
