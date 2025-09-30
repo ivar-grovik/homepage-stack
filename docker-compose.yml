@@ -11,7 +11,7 @@ services:
       - /home/pi/dockers/homepage:/app/config # Make sure your local config directory exists
       - /var/run/docker.sock:/var/run/docker.sock # (optional) For docker integrations
     environment:
-      HOMEPAGE_ALLOWED_HOSTS: gethomepage.dev,192.168.68.50:3001,100.109.108.52:3001 # required, may need port. See gethomepage.dev/installation/#homepage_allowed_hosts
+      HOMEPAGE_ALLOWED_HOSTS: gethomepage.dev,192.168.68.50:3001,100.109.108.52:3001,127.0.0.1:3001 # required, may need port. See gethomepage.dev/installation/#homepage_allowed_hosts
     restart: unless-stopped
     depends_on:
       - line2-proxy
