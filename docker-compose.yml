@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
     depends_on:
       - line2-proxy
+      - cmd-executor
 
   line2-proxy:
     build: ./line2-proxy
@@ -22,3 +23,17 @@ services:
     ports:
       - 3000:3000
     restart: unless-stopped
+
+  cmd-executor:
+    build: ./cmd-executor
+    container_name: cmd-executor
+    volumes:
+      - /proc:/host/proc:ro  # For system information
+      - /sys:/host/sys:ro    # For system information
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker status
+      - /opt/homepage-scripts:/opt/homepage-scripts:ro  # ExpressVPN scripts
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    network_mode: host  # Required to run host commands effectively
+    privileged: true  # Required for ExpressVPN control
