@@ -136,12 +136,80 @@ const allowedCommands = {
       }
     },
     description: 'Stop all barrier processes'
+  },
+  'barrier-start': {
+    command: async () => {
+      try {
+        const processes = await getBarrierProcesses();
+        if (processes.length > 0) {
+          return {
+            status: 'already_running',
+            message: `Barrier is already running (${processes.length} processes)`,
+            icon: '🟢'
+          };
+        }
+        
+        // Start barrier client (you may need to adjust this command based on your setup)
+        const startCommand = 'nohup barrierc -f --no-tray --debug INFO --name raspberrypi --disable-crypto 192.168.68.69:24800 > /dev/null 2>&1 &';
+        await execAsync(startCommand);
+        
+        // Wait a moment and check if it started
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const newProcesses = await getBarrierProcesses();
+        
+        if (newProcesses.length > 0) {
+          return {
+            status: 'started',
+            message: `Barrier started successfully (${newProcesses.length} processes)`,
+            icon: '🟢'
+          };
+        } else {
+          return {
+            status: 'failed_start',
+            message: 'Failed to start barrier - check connection to server',
+            icon: '🟡'
+          };
+        }
+      } catch (error) {
+        return {
+          status: 'error',
+          message: `Error starting barrier: ${error.message}`,
+          icon: '❌'
+        };
+      }
+    },
+    description: 'Start barrier client'
+  },
+  'barrier-toggle': {
+    command: async () => {
+      try {
+        const processes = await getBarrierProcesses();
+        
+        if (processes.length > 0) {
+          // Stop barrier
+          const stopResult = await allowedCommands['barrier-stop'].command();
+          return stopResult;
+        } else {
+          // Start barrier
+          const startResult = await allowedCommands['barrier-start'].command();
+          return startResult;
+        }
+      } catch (error) {
+        return {
+          status: 'error',
+          message: `Error toggling barrier: ${error.message}`,
+          icon: '❌'
+        };
+      }
+    },
+    description: 'Toggle barrier on/off'
   }
 };
 
 // Generic status endpoint
 app.get('/status/:command', async (req, res) => {
   const command = req.params.command;
+  console.log(`[${new Date().toISOString()}] Status request for: ${command} from ${req.ip}`);
   
   if (!allowedCommands[command]) {
     return res.status(404).json({
@@ -152,6 +220,7 @@ app.get('/status/:command', async (req, res) => {
   
   try {
     const result = await allowedCommands[command].command();
+    console.log(`[${new Date().toISOString()}] Status result:`, result);
     res.json(result);
   } catch (error) {
     console.error(`Error executing ${command}:`, error);
@@ -176,6 +245,58 @@ app.post('/action/:command', async (req, res) => {
   try {
     const result = await allowedCommands[command].command();
     res.json(result);
+  } catch (error) {
+    console.error(`Error executing ${command}:`, error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
+// Action endpoint for GET requests (for simple links)
+app.get('/action/:command', async (req, res) => {
+  const command = req.params.command;
+  console.log(`[${new Date().toISOString()}] Action request for: ${command} from ${req.ip}`);
+  
+  if (!allowedCommands[command]) {
+    return res.status(404).json({
+      error: 'Command not found',
+      available: Object.keys(allowedCommands)
+    });
+  }
+  
+  try {
+    const result = await allowedCommands[command].command();
+    console.log(`[${new Date().toISOString()}] Action result:`, result);
+    
+    // For web browser requests, return a simple HTML page
+    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+      res.send(`
+        <html>
+          <head>
+            <title>Barrier Control</title>
+            <meta http-equiv="refresh" content="2; url=http://192.168.68.50:3001">
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1e1e2e; color: white; }
+              .result { background: #313244; padding: 20px; border-radius: 8px; margin: 20px auto; max-width: 400px; }
+              .icon { font-size: 48px; margin-bottom: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="result">
+              <div class="icon">${result.icon || '🔄'}</div>
+              <h2>Barrier Control</h2>
+              <p><strong>Status:</strong> ${result.status}</p>
+              <p><strong>Message:</strong> ${result.message}</p>
+              <p>Redirecting to homepage in 2 seconds...</p>
+            </div>
+          </body>
+        </html>
+      `);
+    } else {
+      res.json(result);
+    }
   } catch (error) {
     console.error(`Error executing ${command}:`, error);
     res.status(500).json({
