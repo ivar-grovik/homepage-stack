@@ -13,14 +13,20 @@ app.use(express.json());
 // Helper function to get barrier processes
 async function getBarrierProcesses() {
   try {
-    const { stdout } = await execAsync("ps aux | grep -i barrier | grep -v grep || echo 'No processes found'");
+    // More specific search to avoid false positives from curl commands, etc.
+    const { stdout } = await execAsync("ps aux | grep -E '(barrierc|barriers|/usr/bin/barrier)' | grep -v grep || echo 'No processes found'");
     const lines = stdout.trim().split('\n');
     
     if (lines.length === 1 && lines[0] === 'No processes found') {
       return [];
     }
     
-    const processes = lines.filter(line => line.includes('barrier')).map(line => {
+    const processes = lines.filter(line => {
+      // Filter out our own API calls and other false positives
+      return !line.includes('curl') && 
+             !line.includes('barrier-control') &&
+             (line.includes('barrierc') || line.includes('barriers') || line.includes('/usr/bin/barrier'));
+    }).map(line => {
       const parts = line.trim().split(/\s+/);
       const pid = parts[1];
       const command = parts.slice(10).join(' ');
@@ -29,7 +35,7 @@ async function getBarrierProcesses() {
         pid: pid,
         command: command,
         type: command.includes('barrierc') ? 'client' : 
-              command.includes('barriers') ? 'server' : 'unknown'
+              command.includes('barriers') || command.includes('/usr/bin/barrier') ? 'server' : 'unknown'
       };
     });
     
