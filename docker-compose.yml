@@ -16,6 +16,7 @@ services:
     depends_on:
       - line2-proxy
       - cmd-executor
+      - barrier-control
 
   line2-proxy:
     build: ./line2-proxy
@@ -37,3 +38,17 @@ services:
     restart: unless-stopped
     network_mode: host  # Required to run host commands effectively
     privileged: true  # Required for ExpressVPN control
+
+  barrier-control:
+    build: ./barrier-control
+    container_name: barrier-control
+    ports:
+      - 3004:3004
+    volumes:
+      - /proc:/host/proc:ro  # For process information
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    network_mode: host  # Required to see and control host processes
+    pid: host  # Required to see host processes
+    privileged: true  # Required to kill processes
