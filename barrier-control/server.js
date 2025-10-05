@@ -142,6 +142,7 @@ const allowedCommands = {
 // Generic status endpoint
 app.get('/status/:command', async (req, res) => {
   const command = req.params.command;
+  console.log(`[${new Date().toISOString()}] Status request for: ${command} from ${req.ip}`);
   
   if (!allowedCommands[command]) {
     return res.status(404).json({
@@ -152,6 +153,7 @@ app.get('/status/:command', async (req, res) => {
   
   try {
     const result = await allowedCommands[command].command();
+    console.log(`[${new Date().toISOString()}] Status result:`, result);
     res.json(result);
   } catch (error) {
     console.error(`Error executing ${command}:`, error);
